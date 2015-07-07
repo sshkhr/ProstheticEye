@@ -17,12 +17,14 @@ class symmetric_pair{
 public:
 	const pcl::PointXYZ &a;
 	const pcl::PointXYZ &b;
+	/*These are the co-ordinates of point on the plane closest to origin*/
 	float alpha;
 	float beta;
 	float gamma;
-	float theta;
-	float phi;
-	float r;
+	/*These are the spherical co-ordinates of point on the plane closest to origin*/
+	//float theta;
+	//float phi;
+	//float r;
 	symmetric_pair(pcl::PointXYZ &_a,pcl::PointXYZ &_b):
 		a(_a),
 		b(_b){
@@ -34,9 +36,9 @@ public:
 			alpha = dx*rho/eta;
 			beta = dy*rho/eta;
 			gamma = dz*rho/eta;
-			phi = atan2(gamma,sqrt(alpha*alpha + beta*beta));
-			theta = atan2(beta,alpha);
-			r = sqrt(alpha*alpha + beta*beta + gamma*gamma);
+			//phi = atan2(gamma,sqrt(alpha*alpha + beta*beta));
+			//theta = atan2(beta,alpha);
+			//r = sqrt(alpha*alpha + beta*beta + gamma*gamma);
 		}
 };
 
@@ -47,6 +49,7 @@ int main(){
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud2(new pcl::PointCloud<pcl::PointXYZ>());
 
+    /*Generating 100 points for 2 spheres randomly*/
 	for(int i=0;i<100;i++){
 		float theta = (rand()%10)/10.0*3.1415;
 		float phi = (rand()%10)/10.0*3.1415;
@@ -57,23 +60,10 @@ int main(){
 			source_cloud2->points.push_back(pcl::PointXYZ(x + 10,y,z));
 	}
 
-
-	// for(int i=0;i<100;i++){
-	// 	float theta = (rand()%10)/10.0*3.1415;
-	// 	float phi = (rand()%10)/10.0*3.1415;
-	// 		auto z = r*sin(phi);// + rand()%2/10.0;
-	// 		auto y = r*cos(phi)*sin(theta);// + rand()%2/10.0;
-	// 		auto x = r*cos(phi)*cos(theta);// + rand()%2/10.0;
-	// 		source_cloud->points.push_back(pcl::PointXYZ(x,y,z));
-	// }
-
-	// source_cloud->points.push_back(pcl::PointXYZ(0,0,0));
-	// source_cloud->points.push_back(pcl::PointXYZ(1,0,0));
+    /*creating symmetric pair for the plane from which the 2 points pass */
 	std::vector<symmetric_pair> pairs;
 	for(int i=0;i<source_cloud->points.size();++i){
 		for(int j=0;j<source_cloud2->points.size();++j){
-			// if(i==j)
-			// 	continue;
 			pairs.push_back(
 				symmetric_pair(
 					source_cloud->points[i],
