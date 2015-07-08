@@ -10,9 +10,9 @@ int main(){
 				);
 			};
 
-	const int sampling = 1000;
-	const float pi = 3.1415;
-	const float ra = 1,rb = 0.5,rc = 1.5;
+	//const int sampling = 1000;
+	//const float pi = 3.1415;
+	//const float ra = 1,rb = 0.5,rc = 1.5;
 	srand(time(NULL));
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
 
@@ -80,41 +80,80 @@ int main(){
 	std::cout<<"\nComputingPCs"<<std::endl;
 
 
-	auto rCd = [](pcl::PrincipalCurvatures a,pcl::PrincipalCurvatures b){
-		return pow(a.pc1-b.pc1,2) + pow(a.pc2-b.pc2,2);};
+	// auto rCd = [](pcl::PrincipalCurvatures a,pcl::PrincipalCurvatures b){
+	// 	return pow(a.pc1-b.pc1,2) + pow(a.pc2-b.pc2,2);};
 
 	const float threshold=1e-5*0.7;
 	std::vector<symmetric_pair> pairs;
 
-    for(int i=0;i<source_cloud->points.size();i++){
-		for(int j=0;j<source_cloud->points.size();j++){
-			const float r = 
-				rCd(principal_curvatures->points[i],principal_curvatures->points[j]);
-			const bool print = (i==1 && ((rand()%10) == 0)) && false;//true;
-
-			if(print){
-				std::cout<<r<<"\t("
-						 <<principal_curvatures->points[i].pc1<<","
-						 <<principal_curvatures->points[i].pc2<<")\t("
-						 <<principal_curvatures->points[j].pc1<<","
-						 <<principal_curvatures->points[j].pc2<<")";
-			}
-			if(r<threshold){
-				if(print)
-					std::cout<<"!!!!";
-				pairs.push_back(
-					symmetric_pair(
-						source_cloud->points[i],
-						source_cloud->points[j],
-						i,
-						j
-					)
-				);
-			}
-			if(print)
-				std::cout<<std::endl;
-		}
+	pcl::PointCloud<pcl::PointXYZ>::Ptr signature_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+	for(const auto x: principal_curvatures->points){
+		signature_cloud->points.push_back(pcl::PointXYZ(x.pc1,x.pc2,0));
 	}
+
+	std::cout<<"Testing kdtree"<<std::endl;
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	kdtree.setInputCloud (signature_cloud);
+	pcl::PointXYZ searchPoint(1,1,1);
+	// searchPoint.pc1=0;
+	// searchPoint.pc2=0;
+	// searchPoint.principal_curvature[0] = 0;
+	// searchPoint.principal_curvature[1] = 0;
+	// searchPoint.principal_curvature[2] = 0;
+
+	// int count2 = 0;
+	// for(auto x : principal_curvatures->points){
+	// 	if(!std::isnan(x.pc1)&&!std::isnan(x.pc2)&&count2>20000){
+	// 		searchPoint = x;
+	// 		break;
+	// 	}
+	// 	count2++;
+	// }
+	
+	int K = 50;
+
+  	std::vector<int> pointIdxNKNSearch(K);
+  	std::vector<float> pointNKNSquaredDistance(K);
+
+  	std::cout << "K nearest neighbor search at (" << searchPoint
+            << ") with K=" << K << std::endl;
+	getchar();
+  	if ( kdtree.nearestKSearch (searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0 )
+  	{
+    	for (size_t i = 0; i < pointIdxNKNSearch.size (); ++i)
+      		std::cout << "    "  <<   signature_cloud->points[ pointIdxNKNSearch[i] ] 
+                << " (squared distance: " << pointNKNSquaredDistance[i] << ")" << std::endl;
+  	}
+  	getchar();
+ //    for(int i=0;i<source_cloud->points.size();i++){
+	// 	for(int j=0;j<source_cloud->points.size();j++){
+	// 		const float r = 
+	// 			rCd(principal_curvatures->points[i],principal_curvatures->points[j]);
+	// 		const bool print = (i==1 && ((rand()%10) == 0)) && false;//true;
+
+	// 		if(print){
+	// 			std::cout<<r<<"\t("
+	// 					 <<principal_curvatures->points[i].pc1<<","
+	// 					 <<principal_curvatures->points[i].pc2<<")\t("
+	// 					 <<principal_curvatures->points[j].pc1<<","
+	// 					 <<principal_curvatures->points[j].pc2<<")";
+	// 		}
+	// 		if(r<threshold){
+	// 			if(print)
+	// 				std::cout<<"!!!!";
+	// 			pairs.push_back(
+	// 				symmetric_pair(
+	// 					source_cloud->points[i],
+	// 					source_cloud->points[j],
+	// 					i,
+	// 					j
+	// 				)
+	// 			);
+	// 		}
+	// 		if(print)
+	// 			std::cout<<std::endl;
+	// 	}
+	// }
 
 	pcl::PointCloud<pcl::PointXYZ>::Ptr compare_cloud(new pcl::PointCloud<pcl::PointXYZ>());
 	for(const auto pair:pairs){
@@ -143,10 +182,11 @@ int main(){
 		//std::cout<<k<<" "<<count<<std::endl;
 	}
 	std::cout<<global_count<<std::endl;
-	std::cout<<global_count/((float)pow(2*sampling,2))<<std::endl;	
+	std::cout<<global_count/((float)pow(2*source_cloud->points.size(),2))<<std::endl;	
 
 	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;	
 	viewer = normalsVis(source_cloud, cloud_with_normals);
+
     pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(compare_cloud, 255, 0, 0);
     viewer->addPointCloud<pcl::PointXYZ> (compare_cloud, single_color, "compare cloud");
 
@@ -165,7 +205,7 @@ int main(){
 
 	fprintf(fpts,"ply\n");
 	fprintf(fpts,"format ascii 1.0\n");
-	fprintf(fpts,"element vertex %d\n",source_cloud->points.size());
+	fprintf(fpts,"element vertex %lu\n",source_cloud->points.size());
 	fprintf(fpts,"property float32 x\n");
 	fprintf(fpts,"property float32 y\n");
 	fprintf(fpts,"property float32 z\n"); 
