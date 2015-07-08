@@ -32,6 +32,18 @@ void readf(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
 	}
 }
 
+void readfsamp(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
+{
+	std::ifstream infile(x);
+	float a, b, c;
+
+	while (infile >> a >> b >> c)
+	{
+		if(rand()%50==0)
+    		cld->points.push_back(pcl::PointXYZ(a,b,c));
+	}
+}
+
 class symmetric_pair{
 public:
 	const pcl::PointXYZ &a;

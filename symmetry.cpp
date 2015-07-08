@@ -116,10 +116,16 @@ int main(){
 		}
 	}
 
-
-	// boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;	
-	// viewer = normalsVis(source_cloud, cloud_with_normals);
-
+	pcl::PointCloud<pcl::PointXYZ>::Ptr compare_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+	for(const auto pair:pairs){
+		if (pair.i==100){
+			compare_cloud->points.push_back(pair.b);
+		}
+		if(pair.j==100){
+			compare_cloud->points.push_back(pair.a);
+		}
+	}
+    
 	long int global_count = 0;
 	for(int k = 0;k<source_cloud->points.size();k++){
 		int count = 0;
@@ -139,10 +145,15 @@ int main(){
 	std::cout<<global_count<<std::endl;
 	std::cout<<global_count/((float)pow(2*sampling,2))<<std::endl;	
 
-   //  while (!viewer->wasStopped ()){
-	  //   viewer->spinOnce (100);
-	  //   boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-	  // }
+	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;	
+	viewer = normalsVis(source_cloud, cloud_with_normals);
+    pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(compare_cloud, 255, 0, 0);
+    viewer->addPointCloud<pcl::PointXYZ> (compare_cloud, single_color, "compare cloud");
+
+    while (!viewer->wasStopped ()){
+	     viewer->spinOnce (100);
+	  	   boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+	   }
 
 	// FILE *fpts = fopen("centers.csv","w+");
 	// for(const auto pt:pairs){
@@ -168,4 +179,6 @@ int main(){
 				cloud_with_normals->points[k].normal_x,cloud_with_normals->points[k].normal_y,cloud_with_normals->points[k].normal_z);
 		}
 	 fclose(fpts);
+
+
 }
