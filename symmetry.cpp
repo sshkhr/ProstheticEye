@@ -25,17 +25,17 @@ class symmetric_pair{
 public:
 	const pcl::PointXYZ &a;
 	const pcl::PointXYZ &b;
+	const unsigned int i;
+	const unsigned int j;
 	/*These are the co-ordinates of point on the plane closest to origin*/
 	float alpha;
 	float beta;
 	float gamma;
-	/*These are the spherical co-ordinates of point on the plane closest to origin*/
-	//float theta;
-	//float phi;
-	//float r;
-	symmetric_pair(pcl::PointXYZ &_a,pcl::PointXYZ &_b):
+	symmetric_pair(pcl::PointXYZ &_a,pcl::PointXYZ &_b,unsigned int _i,unsigned int _j):
 		a(_a),
-		b(_b){
+		b(_b),
+		i(_i),
+		j(_j){
 			const auto dz = a.z - b.z;
 			const auto dy = a.y - b.y;
 			const auto dx = a.x - b.x;
@@ -44,18 +44,11 @@ public:
 			alpha = dx*rho/eta;
 			beta = dy*rho/eta;
 			gamma = dz*rho/eta;
-			//phi = atan2(gamma,sqrt(alpha*alpha + beta*beta));
-			//theta = atan2(beta,alpha);
-			//r = sqrt(alpha*alpha + beta*beta + gamma*gamma);
 		}
 };
 
 boost::shared_ptr<pcl::visualization::PCLVisualizer> normalsVis (
-	    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals)
-	{
-	  // --------------------------------------------------------
-	  // -----Open 3D viewer and add point cloud and normals-----
-	  // --------------------------------------------------------
+	    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, pcl::PointCloud<pcl::Normal>::Ptr normals){
 	  boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
 	  viewer->setBackgroundColor (0, 0, 0);
 	  viewer->addPointCloud<pcl::PointXYZ> (cloud, "sample cloud");
@@ -67,34 +60,21 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> normalsVis (
 
 float angleFind(pcl::PointXYZ a,pcl::Normal b){
 //std::cout<<a<<"  &&& "<<b<<std::endl;
-return 
-							-1*(
-							(a.x*b.normal_x)+
-							(a.y*b.normal_y)+
-							(a.z*b.normal_z)
-							)
-							;
+	return -1*((a.x*b.normal_x)+(a.y*b.normal_y)+(a.z*b.normal_z));
 }
 
 
 
 int main(){
-	auto L2norm = [](pcl::PointXYZ a,pcl::Normal b){return sqrt(
-							pow(a.x+b.normal_x,2) +
-							pow(a.y+b.normal_y,2) +
-							pow(a.z+b.normal_z,2)
-								);
-							};
-	/*auto angleFind = [](pcl::PointXYZ a,pcl::Normal b){return 
-							-1*(
-							(a.x*b.normal_x)+
-							(a.y*b.normal_y)+
-							(a.z*b.normal_z)
-							)
-							;};
-	std::cout<<acos(0)<<std::endl;
-	getchar();
-	*/const int sampling = 1000;
+	auto L2norm = [](pcl::PointXYZ a,pcl::Normal b){
+		return sqrt(
+				pow(a.x+b.normal_x,2) +
+				pow(a.y+b.normal_y,2) +
+				pow(a.z+b.normal_z,2)
+				);
+			};
+
+	const int sampling = 1000;
 	const float pi = 3.1415;
 	const float ra = 1,rb = 0.5,rc = 1.5;
 	srand(time(NULL));
@@ -103,7 +83,6 @@ int main(){
 
     /*Generating 1000 points for 2 spheres randomly*/
 	for(int i=0;i<sampling;i++){
-		//float theta = (rand()%5000)/10.0*3.1415*2;
 		float theta  = ((float)(rand()%100000))/100000*pi;
 		float phi = ((float)(rand()%100000))/100000*2*pi;
 		auto z = ra*sin(phi);// + rand()%2/10.0;
@@ -125,173 +104,90 @@ int main(){
 	normal_estimation.setRadiusSearch (0.3);
 	normal_estimation.compute (*cloud_with_normals);
 
-	/*for 2nd point cloud
-	normal_estimation2.setInputCloud (source_cloud2);
-	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree2 (new pcl::search::KdTree<pcl::PointXYZ>);
-	normal_estimation2.setSearchMethod (tree2);
-	pcl::PointCloud<pcl::Normal>::Ptr cloud_with_normals2 (new pcl::PointCloud<pcl::Normal>);
-	normal_estimation2.setRadiusSearch (0.3);
-	normal_estimation2.compute (*cloud_with_normals2);*/
-
-	boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;	
-	viewer = normalsVis(source_cloud, cloud_with_normals);
-
-	
-
 	int k = 0;
 	for(const auto x:cloud_with_normals->points){
 		if(std::isnan(x.normal_x)||std::isnan(x.normal_y)||std::isnan(x.normal_z)){
 			k++;
 		}
 	}
-	//int g = 0;
-	// int count = 0;
-	// for(const auto x:cloud_with_normals->points){
-	// 	if(std::isnan(x.normal_x)||std::isnan(x.normal_y)||std::isnan(x.normal_z)){
-	// 		g++;
-	// 	}
-	// 	std::cout<<angleFind(source_cloud->points[count],x)<<"#"<<x<<"   "<<source_cloud->points[count++]<<std::endl; 
-	// }
-	float angle=0.0;
-	int wrongthings = 0;
-	/*for(int i=0;i<source_cloud->points.size();i++){
-		auto x = cloud_with_normals->points[i];
-		if(std::isnan(x.normal_x)||std::isnan(x.normal_y)||std::isnan(x.normal_z)){
-			g++;
-			continue;
-		}
-		angle = angleFind(source_cloud->points[i],x);
-		if(angle<0.99) {
-			wrongthings++;
-			std::cout<<angle<<"#"<<x<<"   "<<source_cloud->points[i]<<std::endl; 
-		}
-		//std::cout<<angle<<"#"<<x<<"   "<<source_cloud->points[i]<<std::endl; 
-	}*/
-	//std::cout<<"Nans:"<<k<<" "<<std::endl;
-	//std::cout<<"Point pairs with angle jhamela: "<<wrongthings<<std::endl;
 
-    
 	/*calculating principal curvatures and pruning point pairs if k1=k2*/ 
-	pcl::PrincipalCurvaturesEstimation<pcl::PointXYZ, pcl::Normal, pcl::PrincipalCurvatures> principal_curvatures_estimation;
+	pcl::PrincipalCurvaturesEstimation
+		<pcl::PointXYZ, pcl::Normal, pcl::PrincipalCurvatures> principal_curvatures_estimation;
 
-	//for 1st point clo1ud
+	//for 1st point cloud
 	principal_curvatures_estimation.setInputCloud (source_cloud);
 	principal_curvatures_estimation.setInputNormals (cloud_with_normals);
 	principal_curvatures_estimation.setSearchMethod (tree);
 	principal_curvatures_estimation.setRadiusSearch (.1);
-	pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures (new pcl::PointCloud<pcl::PrincipalCurvatures> ());
+	pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures 
+		(new pcl::PointCloud<pcl::PrincipalCurvatures> ());
 	principal_curvatures_estimation.compute (*principal_curvatures);
 
-	/*for 2nd point cloud
-	principal_curvatures_estimation2.setInputCloud (source_cloud2);
-	principal_curvatures_estimation2.setInputNormals (cloud_with_normals2);
-	principal_curvatures_estimation2.setSearchMethod (tree2);
-	principal_curvatures_estimation2.setRadiusSearch (.01);
-	pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures2 (new pcl::PointCloud<pcl::PrincipalCurvatures> ());
-	principal_curvatures_estimation2.compute (*principal_curvatures2);
-    */
+	auto rCd = [](pcl::PrincipalCurvatures a,pcl::PrincipalCurvatures b){
+		return pow(a.pc1-b.pc1,2) + pow(a.pc2-b.pc2,2);};
 
-    /*store k1 and k2 values for both data sets in 4 arrays*/
-	float k1a[principal_curvatures->points.size()/2],k2a[principal_curvatures->points.size()/2];
-	float k1b[principal_curvatures->points.size()/2],k2b[principal_curvatures->points.size()/2];
-
-	for(int i=1;i<principal_curvatures->points.size()/2;i+=2){
-		k1a[i]=principal_curvatures->points[i].pc1;
-		k1b[i]=principal_curvatures->points[i].pc2;
-	}
-    for(int j=2;j<principal_curvatures->points.size()/2;j+=2){
-    	k2a[j]=principal_curvatures->points[j].pc1;
-		k2b[j]=principal_curvatures->points[j].pc2;
-    }
-
-
-	std::cout << "output points.size (): " << principal_curvatures->points.size () << std::endl;
-	//std::cout << "output points.size (): " << principal_curvatures2->points.size () << std::endl;
-
-
-	/*Decide points to ignore based on nearness of k values
-	int ign[principal_curvatures->points.size ()][principal_curvatures->points.size ()];
-    //initialise to 0
-    for(int i=0;i<source_cloud->points.size()/2;++i){
-		for(int j=0;j<source_cloud->points.size()/2;++j){
-			ign[i][j]=0;
-		}
-	}*/
-
-
-
-
-	const float threshold=0.9;
-	float r;
+	const float threshold=1e-5*0.7;
 	std::vector<symmetric_pair> pairs;
-    for(int i=0;i<source_cloud->points.size()/2;i++){
-		for(int j=0;j<source_cloud->points.size()/2;j++){
-			r=((k1a[i]-k1b[j])*(k1a[i]-k1b[j])+(k2a[i]-k2b[j])*(k2a[i]-k2b[j]));
-			if (r>threshold)
-				{
+    for(int i=0;i<source_cloud->points.size();i++){
+		for(int j=0;j<source_cloud->points.size();j++){
+			const float r = 
+				rCd(principal_curvatures->points[i],principal_curvatures->points[j]);
+			const bool print = (i==1 && ((rand()%10) == 0)) && false;
+			if(print){
+				std::cout<<r<<"\t("
+						 <<principal_curvatures->points[i].pc1<<","
+						 <<principal_curvatures->points[i].pc2<<")\t("
+						 <<principal_curvatures->points[j].pc1<<","
+						 <<principal_curvatures->points[j].pc2<<")";
+			}
+			if(r<threshold){
+				if(print)
+					std::cout<<"!!!!";
 				pairs.push_back(
-				symmetric_pair(
-					source_cloud->points[2*i],
-					source_cloud->points[2*j+1]
-				)
-			);
-				}
+					symmetric_pair(
+						source_cloud->points[i],
+						source_cloud->points[j],
+						i,
+						j
+					)
+				);
+			}
+			if(print)
+				std::cout<<std::endl;
 		}
 	}
-		printf("Where is the fault?\n");
 
-	for(int i=1 ;i<source_cloud->points.size();i+=50){
-		r=((k1a[0]-k2a[i])*(k1a[0]-k2a[i])+(k1b[0]-k2b[i])*(k1b[0]-k2b[i]));
-		std::cout<<k2a[i]<<' '<<k2b[i]<<' '<<r<<std::endl;
-		if (r<threshold)
-	  		viewer->addLine<pcl::PointXYZ> (source_cloud->points[0], source_cloud->points[source_cloud->size() - i], boost::lexical_cast<std::string>(i).c_str());
+	// boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;	
+	// viewer = normalsVis(source_cloud, cloud_with_normals);
+
+	long int global_count = 0;
+	for(int k = 0;k<source_cloud->points.size();k++){
+		int count = 0;
+		for(const auto x:pairs){
+			if(x.i == k){
+				count++;
+				global_count++;
+				// viewer->addLine<pcl::PointXYZ>(
+				// 	source_cloud->points[x.i], 
+				// 	source_cloud->points[x.j], 
+				// 	boost::lexical_cast<std::string>(x.j).c_str()
+				// );
+			}
 		}
-
-    while (!viewer->wasStopped ())
-	  {
-	    viewer->spinOnce (100);
-	    boost::this_thread::sleep (boost::posix_time::microseconds (100000));
-	  }
-
-
-	
-    /*creating symmetric pair for the plane from which the 2 points pass 
-	
-	for(int i=0;i<source_cloud->points.size()/2;i+=2){
-		for(int j=1;j<source_cloud->points.size()/2;j+=2){
-			if(!ign[i][j])
-			pairs.push_back(
-				symmetric_pair(
-					source_cloud->points[i],
-					source_cloud2->points[j]
-				)
-			);
-		}
-	}*/
-
-	FILE *fpts1 = fopen("kvalues.txt","w+");
-	for(int i=1;i<principal_curvatures->points.size();i++){
-		fprintf(fpts1,"%f\t%f\t%f\t%f\n",k1a[i],k1b[i],k2a[i],k2b[i]);
+		//std::cout<<k<<" "<<count<<std::endl;
 	}
-	fprintf(fpts1,"\n op size %ld",principal_curvatures->points.size ());
-	fprintf(fpts1,"\n%f\n",principal_curvatures->points[0].pc1);
-	fclose(fpts1);
+	std::cout<<global_count<<std::endl;
+	std::cout<<global_count/((float)pow(2*sampling,2))<<std::endl;	
 
-	//std::cout<<pairs[0].a<<"->"<<pairs[0].b<<std::endl;
-	//std::cout<<pairs[0].alpha<<" "<<pairs[0].beta<<" "<<pairs[0].gamma<<std::endl;
+   //  while (!viewer->wasStopped ()){
+	  //   viewer->spinOnce (100);
+	  //   boost::this_thread::sleep (boost::posix_time::microseconds (100000));
+	  // }
 
-	FILE *fpts = fopen("centers.csv","w+");
-	for(const auto pt:pairs){
-		fprintf(fpts,"%f,%f,%f\n",pt.alpha,pt.beta,pt.gamma);
-	}
-	fclose(fpts);
-
-    /*
-	FILE *fout = fopen("all_pairs.csv","w+");
-	for(const auto pt:pairs){
-		fprintf(fout,"%f,%f,%f\n",pt.phi,pt.theta,pt.r);
-	}
-	fclose(fout);
-	*/
-
+	// FILE *fpts = fopen("centers.csv","w+");
+	// for(const auto pt:pairs){
+	// 	fprintf(fpts,"%f,%f,%f\n",pt.alpha,pt.beta,pt.gamma);
+	// }
+	// fclose(fpts);
 }
