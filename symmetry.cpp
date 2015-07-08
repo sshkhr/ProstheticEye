@@ -32,6 +32,18 @@ void readf(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
 	}
 }
 
+void readfsamp(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
+{
+	std::ifstream infile(x);
+	float a, b, c;
+
+	while (infile >> a >> b >> c)
+	{
+		if(rand()%50==0)
+    		cld->points.push_back(pcl::PointXYZ(a,b,c));
+	}
+}
+
 
 class symmetric_pair{
 public:
@@ -96,9 +108,9 @@ int main(){
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud2(new pcl::PointCloud<pcl::PointXYZ>());
 
 
-	readf("airplane.xyz",source_cloud);
+	readfsamp("Scan2.xyz",source_cloud);
 
-	std::cout<<"Fault"<<std::endl;
+	std::cout<<"ReadSource"<<std::endl;
 
     /*Generating 1000 points for 2 spheres randomly
 	for(int i=0;i<sampling;i++){
@@ -119,8 +131,17 @@ int main(){
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	normal_estimation.setSearchMethod (tree);
 	pcl::PointCloud<pcl::Normal>::Ptr cloud_with_normals (new pcl::PointCloud<pcl::Normal>);
-	normal_estimation.setRadiusSearch (0.3);
+	normal_estimation.setRadiusSearch (24);
+
+	std::cout<<sizeof(symmetric_pair)<<std::endl;
+	getchar();
+
+
+	std::cout<<"\nComputingNormals"<<std::endl;
+
 	normal_estimation.compute (*cloud_with_normals);
+
+	std::cout<<"\nNormalsComputed"<<std::endl;
 
 	int k = 0;
 	for(const auto x:cloud_with_normals->points){
@@ -140,18 +161,25 @@ int main(){
 	principal_curvatures_estimation.setRadiusSearch (.1);
 	pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principal_curvatures 
 		(new pcl::PointCloud<pcl::PrincipalCurvatures> ());
+
+	std::cout<<"\nComputingPCs"<<std::endl;
+
 	principal_curvatures_estimation.compute (*principal_curvatures);
+
+	std::cout<<"\nComputingPCs"<<std::endl;
+
 
 	auto rCd = [](pcl::PrincipalCurvatures a,pcl::PrincipalCurvatures b){
 		return pow(a.pc1-b.pc1,2) + pow(a.pc2-b.pc2,2);};
 
 	const float threshold=1e-5*0.7;
 	std::vector<symmetric_pair> pairs;
+
     for(int i=0;i<source_cloud->points.size();i++){
 		for(int j=0;j<source_cloud->points.size();j++){
 			const float r = 
 				rCd(principal_curvatures->points[i],principal_curvatures->points[j]);
-			const bool print = (i==1 && ((rand()%10) == 0)) && false;
+			const bool print = (i==1 && ((rand()%10) == 0)) && false;//true;
 			if(print){
 				std::cout<<r<<"\t("
 						 <<principal_curvatures->points[i].pc1<<","
@@ -184,7 +212,7 @@ int main(){
 	for(int k = 0;k<source_cloud->points.size();k++){
 		int count = 0;
 		for(const auto x:pairs){
-			if(x.i == k){
+			if(x.i==k){
 				count++;
 				global_count++;
 				// viewer->addLine<pcl::PointXYZ>(
@@ -209,4 +237,23 @@ int main(){
 	// 	fprintf(fpts,"%f,%f,%f\n",pt.alpha,pt.beta,pt.gamma);
 	// }
 	// fclose(fpts);
+
+	FILE *fpts = fopen("data.ply","w+");
+
+	fprintf(fpts,"ply\n");
+	fprintf(fpts,"format ascii 1.0\n");
+	fprintf(fpts,"element vertex %d\n",source_cloud->points.size());
+	fprintf(fpts,"property float32 x\n");
+	fprintf(fpts,"property float32 y\n");
+	fprintf(fpts,"property float32 z\n"); 
+	fprintf(fpts,"property float32 nx\n"); 
+	fprintf(fpts,"property float32 ny\n"); 
+	fprintf(fpts,"property float32 nz\n"); 
+	fprintf(fpts,"end_header\n");
+	for(int k = 0;k<source_cloud->points.size();k++){
+		fprintf(fpts,"%f %f %f %f %f %f\n",
+				source_cloud->points[k].x,source_cloud->points[k].y,source_cloud->points[k].z,
+				cloud_with_normals->points[k].normal_x,cloud_with_normals->points[k].normal_y,cloud_with_normals->points[k].normal_z);
+		}
+	 fclose(fpts);
 }
