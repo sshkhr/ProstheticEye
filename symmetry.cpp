@@ -3,6 +3,7 @@
 #include <CGAL/Triangulation_vertex_base_with_info_2.h>
 
 #include <pcl/io/pcd_io.h>
+#include <pcl/io/ply_io.h>
 #include <pcl/common/common_headers.h>
 #include <pcl/point_types.h>
 #include <pcl/features/normal_3d.h>
@@ -20,6 +21,17 @@
 #include <ctime>
 #include <cstdlib>
 #include <vector> 
+
+void readf(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
+{
+	std::ifstream infile(x);
+	float a, b, c;
+	while (infile >> a >> b >> c)
+	{
+      cld->points.push_back(pcl::PointXYZ(a,b,c));
+	}
+}
+
 
 class symmetric_pair{
 public:
@@ -58,6 +70,8 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> normalsVis (
 	  return (viewer);
 	}
 
+
+
 float angleFind(pcl::PointXYZ a,pcl::Normal b){
 //std::cout<<a<<"  &&& "<<b<<std::endl;
 	return -1*((a.x*b.normal_x)+(a.y*b.normal_y)+(a.z*b.normal_z));
@@ -81,7 +95,12 @@ int main(){
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud2(new pcl::PointCloud<pcl::PointXYZ>());
 
-    /*Generating 1000 points for 2 spheres randomly*/
+
+	readf("airplane.xyz",source_cloud);
+
+	std::cout<<"Fault"<<std::endl;
+
+    /*Generating 1000 points for 2 spheres randomly
 	for(int i=0;i<sampling;i++){
 		float theta  = ((float)(rand()%100000))/100000*pi;
 		float phi = ((float)(rand()%100000))/100000*2*pi;
@@ -90,11 +109,10 @@ int main(){
 		auto x = rc*cos(phi)*cos(theta);// + rand()%2/10.0;
 		source_cloud->points.push_back(pcl::PointXYZ(x,y,z));
 		source_cloud->points.push_back(pcl::PointXYZ(x + 10,y,z));
-	}
+	}*/
 
     /*Compute the normals*/
 	pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimation;
-	pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_estimation2;
 
 	//for 1st point cloud
 	normal_estimation.setInputCloud (source_cloud);
@@ -157,6 +175,7 @@ int main(){
 				std::cout<<std::endl;
 		}
 	}
+
 
 	// boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;	
 	// viewer = normalsVis(source_cloud, cloud_with_normals);
