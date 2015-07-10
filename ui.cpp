@@ -34,14 +34,23 @@ typedef adjacency_list < listS, vecS, directedS,
   no_property, property < edge_weight_t, double > > graph_t;
 typedef graph_traits < graph_t >::vertex_descriptor vertex_descriptor;
 typedef std::pair<int, int> Edge;
-
 typedef pcl::visualization::PCLVisualizer Visualizer;
+
+inline double L2norm(const pcl::PointXYZ &a,const pcl::PointXYZ &b){
+	return sqrt(pow(a.x-b.x,2) + pow(a.y-b.y,2) + pow(a.z-b.z,2));
+}
+
 struct OFFData{
 	std::vector<int> nodes;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud;
 	std::vector<Edge> edges;
+	std::vector<double> weights;
 	OFFData(std::vector<int> &_nodes, pcl::PointCloud<pcl::PointXYZ>::Ptr _source_cloud, std::vector<Edge> &_edges):
-		nodes(_nodes),source_cloud(_source_cloud), edges(_edges){}
+		nodes(_nodes),source_cloud(_source_cloud), edges(_edges){
+		for(const auto &x:edges){
+			weights.push_back(L2norm(source_cloud->points[x.first],source_cloud->points[x.second]));
+		}
+	}
 
 };
 
@@ -49,7 +58,7 @@ struct uiState{
 	boost::shared_ptr<Visualizer> visualizer;
 	pcl::PointCloud<pcl::PointXYZ>::ConstPtr sourceCloud;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr patchCloud;
-	std::string patchLabel;	
+	std::string patchLabel;
 	graph_t *graph;
 	std::vector<vertex_descriptor> chosenPoints;
 	int firstChosen;
@@ -82,10 +91,6 @@ struct uiState{
 		WASDenabled = false;
 	}
 };
-
-inline double L2norm(const pcl::PointXYZ &a,const pcl::PointXYZ &b){
-	return sqrt(pow(a.x-b.x,2) + pow(a.y-b.y,2) + pow(a.z-b.z,2));
-}
 
 OFFData parseOff(const std::string &filename){
 	std::ifstream infile(filename);
@@ -125,14 +130,17 @@ OFFData parseOff(const std::string &filename){
 		infile>>i0>>i1>>i2>>i3;
 		if(!(added[i1][i2]||added[i2][i1])){
 			edges.push_back(Edge(i1,i2));
+			edges.push_back(Edge(i2,i1));
 			added[i1][i2]=added[i2][i1]=true;
 		}
 		if(!(added[i3][i2]||added[i2][i3])){
 			edges.push_back(Edge(i3,i2));
+			edges.push_back(Edge(i2,i3));
 			added[i3][i2]=added[i2][i3]=true;
 		}
 		if(!(added[i1][i3]||added[i3][i1])){
 			edges.push_back(Edge(i1,i3));
+			edges.push_back(Edge(i3,i1));
 			added[i1][i3]=added[i3][i1]=true;
 		}
 	}
@@ -183,22 +191,98 @@ pcl::PointXYZ findClosestReflection(pcl::PointXYZ plane, pcl::PointXYZ point,
 	return pcl::PointXYZ(0,0,0);
 }
 
+boost::shared_ptr<Visualizer> makeVisualizer(){
+	boost::shared_ptr<Visualizer> viewer (new Visualizer ("3D Viewer"));
+	viewer->setBackgroundColor (0, 0, 0);
+	viewer->initCameraParameters ();
+	return (viewer);
+}
+
+void findShortestPath(graph_t &g,vertex_descriptor s,vertex_descriptor t,std::vector<vertex_descriptor> &out){
+	/*
+	Graph must be connected
+	Does not erase the output vector contents
+	*/
+  	property_map<graph_t, edge_weight_t>::type weightmap = get(edge_weight, g);
+  	std::vector<vertex_descriptor> p(num_vertices(g));
+  	std::vector<int> d(num_vertices(g));
+
+	dijkstra_shortest_paths(g, s,
+		predecessor_map(boost::make_iterator_property_map(p.begin(), get(boost::vertex_index, g))).
+		distance_map(boost::make_iterator_property_map(d.begin(), get(boost::vertex_index, g))));
+
+	do{
+		out.push_back(t);
+		if(t==p[t])
+			return;
+		t = p[t];
+	}while(t!=s);
+}
+
+void pp_callback(const pcl::visualization::PointPickingEvent &e,void *in){
+	uiState *state = (uiState *)in; 
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(state->patchCloud,
+		std::get<0>(state->color),
+		std::get<1>(state->color),
+		std::get<2>(state->color));
+	std::cout<<"Hello"<<std::endl;
+	if(state->pointPickingDone){
+		std::cout<<"Bye"<<std::endl;
+		return;
+	}
+	if(!state->firstPointPicked){
+		std::cout<<"Tarjan"<<std::endl;
+		state->chosenPoints.clear();
+		state->firstPointPicked = true;
+		state->firstChosen = e.getPointIndex();
+		state->lastChosen = e.getPointIndex();
+		state->patchCloud->points.push_back(state->sourceCloud->points[e.getPointIndex()]);
+		state->chosenPoints.push_back(e.getPointIndex());
+	}
+	else{
+		int newPoint = e.getPointIndex();
+  		findShortestPath(*state->graph,state->lastChosen,newPoint,state->chosenPoints);
+  		for(const auto x:state->chosenPoints)
+			state->patchCloud->points.push_back(state->sourceCloud->points[x]);	
+  		state->lastChosen = newPoint;
+	}
+	state->visualizer->updatePointCloud(state->patchCloud,single_color,state->patchLabel);
+}
+
+void addCloud(boost::shared_ptr<Visualizer> viewer,pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud,const std::string &label){
+	viewer->addPointCloud<pcl::PointXYZ> (cloud, label.c_str());
+	viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, label.c_str());
+}
+
+void addRedCloud(boost::shared_ptr<Visualizer> viewer,pcl::PointCloud<pcl::PointXYZ>::ConstPtr cloud,const std::string &label){
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> single_color(cloud, 255, 0, 0);
+    viewer->addPointCloud<pcl::PointXYZ> (cloud, single_color, label.c_str());
+    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, label.c_str());
+}
+
 int main(){
 	OFFData d = parseOff("Full_face.off");
 	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
 	kdtree.setInputCloud (d.source_cloud);
-	//pcl::PointXYZ test_point(0,0,0);
-	//std::cout<<"For point "<<test_point<<", reflection is on: ";
-	//std::cout<<findReflection(pcl::PointXYZ(1,1,1),test_point)<<std::endl;
-	
-	//std::cout<<findClosestReflection(pcl::PointXYZ(9.327223,0.468285,0.717058),d.source_cloud->points[2000],kdtree,d.source_cloud)<<std::endl;
-	
-	// for(int i=0;i<10;i++){
-	// 	std::cout<<d.nodes[i]<<" : "<<d.source_cloud->points[i]<<std::endl;
-	// }
-	// for(int i=0;i<10;i++){
-	// 	std::cout<<d.nodes[i]<<" : "<<d.edges[i].first<<" "<<d.edges[i].second<<std::endl;
-	// }
+	auto v = makeVisualizer();
+	/*
+	UI to select points
+	Just keep shift + selecting, 
+	u to undo,
+	l to finish
+	*/
 
-	return 0;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr patch(new pcl::PointCloud<pcl::PointXYZ>());
+	const std::string patch_label("patch");
+  	graph_t g(d.edges.begin(),d.edges.end(),d.weights.begin(),d.nodes.size());
+	uiState state(v,d.source_cloud,patch,patch_label,&g);
+  	v->registerPointPickingCallback(pp_callback,(void *)&state);
+  	addCloud(v,d.source_cloud,"source");
+  	addRedCloud(v,patch,patch_label);
+
+	while(!v->wasStopped()){
+		v->spinOnce(100);
+		boost::this_thread::sleep(boost::posix_time::microseconds(10000));
+	}
+	return 1;
 }
