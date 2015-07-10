@@ -6,6 +6,7 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/point_picking_event.h>
 #include <pcl/io/ply_io.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
@@ -102,7 +103,7 @@ OFFData parseOff(const std::string &filename){
 	float x, y, z;
 	for(int i = 0; i<length;i++){
 		infile >> x >> y >> z;
-		std::cout<<x<<" "<<y<<" "<<z<<std::endl;
+		//std::cout<<x<<" "<<y<<" "<<z<<std::endl;
 		source_cloud->points.push_back(pcl::PointXYZ(x,y,z));
 	}
 	std::cout<<"Done"<<std::endl;
@@ -141,13 +142,63 @@ OFFData parseOff(const std::string &filename){
 
 }
 
+inline bool pointIsValid(pcl::PointXYZ &x){
+	if(std::isnan(x.x)||std::isnan(x.y)||std::isnan(x.z)){
+			return false;
+	}
+	return true;
+}
+
+inline float getNorm(pcl::PointXYZ point){
+	return pow(point.x,2)+pow(point.y,2)+pow(point.z,2);
+}
+
+inline float reflectionCoeff(pcl::PointXYZ plane, pcl::PointXYZ point){
+	const float d = getNorm(plane); // check if passing *& blah
+	return 2*(d-(point.x*plane.x)-(point.y*plane.y)-(point.z*plane.z))/d;
+}
+
+pcl::PointXYZ findReflection(pcl::PointXYZ plane, pcl::PointXYZ point){
+	const float coeff = reflectionCoeff(plane, point);
+	return pcl::PointXYZ(point.x+(plane.x*coeff),point.y+(plane.y*coeff),point.z+(plane.z*coeff));
+}
+
+pcl::PointXYZ findClosestReflection(pcl::PointXYZ plane, pcl::PointXYZ point, 
+								pcl::KdTreeFLANN<pcl::PointXYZ> &kdtree, pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud){
+	//Reflect the point
+	//float coeff = reflectionCoeff(plane, point);
+	pcl::PointXYZ reflected_point = findReflection(plane, point);//(point.x+(plane.x*coeff),point.y+(plane.y*coeff),point.z+(plane.z*coeff));
+	
+	//Find nearest neighbor
+	int K = 1;
+	std::vector<int> pointIdxNKNSearch(K);
+ 	std::vector<float> pointNKNSquaredDistance(K);
+ // 	if(!pointIsValid(reflected_point)){
+	// 	return NULL;
+	// }
+	//std::cout<<signature_cloud->points[i];
+	if ( kdtree.nearestKSearch (reflected_point, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0 ){
+		return source_cloud->points[pointIdxNKNSearch[0]];
+	}
+	return pcl::PointXYZ(0,0,0);
+}
+
 int main(){
 	OFFData d = parseOff("Full_face.off");
-	for(int i=0;i<10;i++){
-		std::cout<<d.nodes[i]<<" : "<<d.source_cloud->points[i]<<std::endl;
-	}
-	for(int i=0;i<10;i++){
-		std::cout<<d.nodes[i]<<" : "<<d.edges[i].first<<" "<<d.edges[i].second<<std::endl;
-	}
+	pcl::KdTreeFLANN<pcl::PointXYZ> kdtree;
+	kdtree.setInputCloud (d.source_cloud);
+	//pcl::PointXYZ test_point(0,0,0);
+	//std::cout<<"For point "<<test_point<<", reflection is on: ";
+	//std::cout<<findReflection(pcl::PointXYZ(1,1,1),test_point)<<std::endl;
+	
+	//std::cout<<findClosestReflection(pcl::PointXYZ(9.327223,0.468285,0.717058),d.source_cloud->points[2000],kdtree,d.source_cloud)<<std::endl;
+	
+	// for(int i=0;i<10;i++){
+	// 	std::cout<<d.nodes[i]<<" : "<<d.source_cloud->points[i]<<std::endl;
+	// }
+	// for(int i=0;i<10;i++){
+	// 	std::cout<<d.nodes[i]<<" : "<<d.edges[i].first<<" "<<d.edges[i].second<<std::endl;
+	// }
+
 	return 0;
 }
