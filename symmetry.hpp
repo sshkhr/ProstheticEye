@@ -10,7 +10,7 @@
 #include <pcl/features/principal_curvatures.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/kdtree/kdtree_flann.h>
-
+	
 #include <boost/lexical_cast.hpp>
 
 
@@ -40,15 +40,13 @@ void readfsamp(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
 
 	while (infile >> a >> b >> c)
 	{
-		if(rand()%50==0)
+		if(rand()%50==0) //change to rand()%50 when generating the transform space
     		cld->points.push_back(pcl::PointXYZ(a,b,c));
 	}
 }
 
 class symmetric_pair{
 public:
-	const pcl::PointXYZ &a;
-	const pcl::PointXYZ &b;
 	const unsigned int i;
 	const unsigned int j;
 	/*These are the co-ordinates of point on the plane closest to origin*/
@@ -56,14 +54,12 @@ public:
 	float beta;
 	float gamma;
 	symmetric_pair(pcl::PointXYZ &_a,pcl::PointXYZ &_b,unsigned int _i,unsigned int _j):
-		a(_a),
-		b(_b),
-		i(_i),
+		i(_i),	
 		j(_j){
-			const auto dz = a.z - b.z;
-			const auto dy = a.y - b.y;
-			const auto dx = a.x - b.x;
-			const auto rho = a.x*a.x + a.y*a.y + a.z*a.z - b.x*b.x - b.y*b.y - b.z*b.z;
+			const auto dz = _a.z - _b.z;
+			const auto dy = _a.y - _b.y;
+			const auto dx = _a.x - _b.x;
+			const auto rho = _a.x*_a.x + _a.y*_a.y + _a.z*_a.z - _b.x*_b.x - _b.y*_b.y - _b.z*_b.z;
 			const auto eta = 2*(dx*dx + dy*dy + dz*dz);
 			alpha = dx*rho/eta;
 			beta = dy*rho/eta;
@@ -85,4 +81,25 @@ boost::shared_ptr<pcl::visualization::PCLVisualizer> normalsVis (
 float angleFind(pcl::PointXYZ a,pcl::Normal b){
 //std::cout<<a<<"  &&& "<<b<<std::endl;
 	return -1*((a.x*b.normal_x)+(a.y*b.normal_y)+(a.z*b.normal_z));
+}
+
+bool normalIsValid(pcl::Normal &x){
+	if(std::isnan(x.normal_x)||std::isnan(x.normal_y)||std::isnan(x.normal_z)){
+			return true;
+	}
+	return false;
+}
+
+bool pointIsValid(pcl::PointXYZ &x){
+	if(std::isnan(x.x)||std::isnan(x.y)||std::isnan(x.z)){
+			return false;
+	}
+	return true;
+}
+
+bool pairIsValid(const symmetric_pair &x){
+	if(std::isnan(x.alpha)||std::isnan(x.beta)||std::isnan(x.gamma)){
+			return false;
+	}
+	return true;
 }
