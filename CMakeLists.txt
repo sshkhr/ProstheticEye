@@ -29,6 +29,8 @@ if ( CGAL_FOUND )
   target_link_libraries(deluanay_graph ${PCL_LIBRARIES})
   create_single_source_cgal_program( "symmetry.cpp" )
   target_link_libraries(symmetry ${PCL_LIBRARIES})
+  create_single_source_cgal_program( "ui.cpp" )
+  target_link_libraries(ui ${PCL_LIBRARIES})
 
 else()
   
