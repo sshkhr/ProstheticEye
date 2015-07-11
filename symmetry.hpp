@@ -40,7 +40,7 @@ void readfsamp(const std::string &x ,pcl::PointCloud<pcl::PointXYZ>::Ptr cld)
 
 	while (infile >> a >> b >> c)
 	{
-		if(rand()%50==0) //change to rand()%50 when generating the transform space
+		if(rand()%1==0) //change to rand()%50 when generating the transform space for Vinayak face: Full_face.xyz
     		cld->points.push_back(pcl::PointXYZ(a,b,c));
 	}
 }
